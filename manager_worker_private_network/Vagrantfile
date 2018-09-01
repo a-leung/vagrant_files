@@ -1,0 +1,48 @@
+BOX_IMAGE = "ubuntu/xenial64"
+WORKER_COUNT = 0
+
+MANAGER_IP_ADDRESS = "192.168.100.10"
+
+Vagrant.configure("2") do |config|
+ config.vm.box = BOX_IMAGE
+
+  config.vm.define "manager" do |subconfig|
+    subconfig.vm.box = BOX_IMAGE
+    subconfig.vm.hostname = "manager"
+    subconfig.vm.network :private_network, ip: MANAGER_IP_ADDRESS
+    subconfig.vm.network "forwarded_port", guest: 3000, host: 3500
+  end
+
+  (1..WORKER_COUNT).each do |worker_count|
+    config.vm.define "worker#{worker_count}" do |subconfig|
+      subconfig.vm.box = BOX_IMAGE
+      subconfig.vm.hostname = "worker#{worker_count}"
+      subconfig.vm.network :private_network, ip: "192.168.100.#{10 + worker_count}"
+      subconfig.vm.network "forwarded_port", guest: 3000, host: (3500 + worker_count)
+    end
+  end
+
+  config.vm.provider "virtualbox" do |vb|
+    # Customize the amount of memory on the VM:
+    vb.memory = "1024"
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+     echo "provisioning"
+     apt-get install \
+             apt-transport-https \
+       ca-certificates \
+       curl \
+       software-properties-common
+
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+    apt-key fingerprint 0EBFCD88
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+    apt-get update
+    apt-get install -y docker-ce
+    usermod -aG docker ubuntu
+
+  SHELL
+end
